@@ -1,4 +1,4 @@
-import os, uuid, sys
+import os
 from azure.storage.filedatalake import DataLakeServiceClient
 from azure.identity import ClientSecretCredential
 import pandas as pd
@@ -8,7 +8,12 @@ class ConnectionAzureDataLake:
     def __init__(self):
         pass
 
-    def initialize_storage_account_ad(self, storage_account_name, client_id, client_secret, tenant_id):
+    def initialize_storage_account_ad_env_variable(self):
+        client_id = os.environ['client_id']
+        client_secret = os.environ['client_secret']
+        tenant_id = os.environ['tenant_id']
+        storage_account_name = os.environ['storage_account_name']
+
         credential = ClientSecretCredential(tenant_id, client_id, client_secret)
 
         self.service_client = DataLakeServiceClient(account_url="{}://{}.dfs.core.windows.net".format(
@@ -32,6 +37,20 @@ class ConnectionAzureDataLake:
             count+=1
 
         return pd.DataFrame(directories).T
+
+    def list_containers(self):
+        containers = self.service_client.list_file_systems()
+
+        all_containers_dict = dict()
+        count=0
+        for container in containers:
+            containers_dict = dict()
+            containers_dict['container'] = container.name
+            containers_dict['last_modified'] = container.last_modified
+            all_containers_dict[count] = containers_dict.copy()
+            count+=1
+
+        return pd.DataFrame(all_containers_dict).T
 
     def create_container(self, container_name):
         self.file_system_client = self.service_client.create_file_system(file_system=container_name)
