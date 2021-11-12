@@ -9,6 +9,8 @@ class ConnectionAzureDataLake:
         pass
 
     def initialize_storage_account_ad_env_variable(self):
+        """get cliend id, client secrect, tenant id and the storage account name from the enviroment variables and authenticat.
+        """
         client_id = os.environ['client_id']
         client_secret = os.environ['client_secret']
         tenant_id = os.environ['tenant_id']
@@ -21,6 +23,15 @@ class ConnectionAzureDataLake:
     
 
     def list_directory_contents(self, container, path=''):
+        """list all directory content.
+
+        Args:
+            container (str): container name.
+            path (str, optional): path to that will be list content. Defaults to ''.
+
+        Returns:
+            DataFrame: return a dataframe with the permission, path, last modified data, owner and the name of the directory.
+        """
         file_system_client = self.service_client.get_file_system_client(file_system=container)
 
         paths = file_system_client.get_paths(path=path)
@@ -39,6 +50,11 @@ class ConnectionAzureDataLake:
         return pd.DataFrame(directories).T
 
     def list_containers(self):
+        """list containers in the storage account.
+
+        Returns:
+            DataFrame: Returns a dataframe with the container name and the last date of modification.
+        """
         containers = self.service_client.list_file_systems()
 
         all_containers_dict = dict()
@@ -53,25 +69,60 @@ class ConnectionAzureDataLake:
         return pd.DataFrame(all_containers_dict).T
 
     def create_container(self, container_name):
+        """create a new container in the storage account.
+
+        Args:
+            container_name (str): container name.
+        """
         self.file_system_client = self.service_client.create_file_system(file_system=container_name)
 
     def create_directory(self, container, path):
+        """create a directory in the container.
+
+        Args:
+            container (str): name of the container.
+            path (str): path that will be created.
+        """
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         file_system_client.create_directory(path)
 
     def rename_directory(self, container, directory, new_directory_name):
+        """rename directory in the datalake, it is the same of move a file.
+
+        Args:
+            container (str): name of the container.
+            directory (str): old directory name.
+            new_directory_name (str): new directory name.
+        """
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         directory_client = file_system_client.get_directory_client(directory)
         new_dir_name = new_directory_name
         directory_client.rename_directory(directory_client.file_system_name + '/' + new_dir_name)
 
     def delete_directory(self, container, path):
+        """delete directory in datalake.
+
+        Args:
+            container (str): name of the contaier
+            path ([type]): path of the file to be deleted
+        """
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         directory_client = file_system_client.get_directory_client(path)
         directory_client.delete_directory()
 
     def save_string_to_file(self, container, path, file_name, string, overwrite=False):
+        """save a string to a file in datalake.
 
+        Args:
+            container (str): name of the container.
+            path (str): path were it will be save.
+            file_name ([type]): name of the file.
+            string ([type]): data that will be save as string.
+            overwrite (bool, optional): if the file will be overwriten or not. Defaults to False.
+
+        Raises:
+            Exception: if the file already exists and overwrite equals false it will be raise.
+        """
         if overwrite==False:
             paths_df = self.list_directory_contents(container=container, path=path)
             if len(paths_df)>0:
@@ -88,7 +139,17 @@ class ConnectionAzureDataLake:
 
         file_client.flush_data(len(file_contents))
 
-    def download_file_as_string(self, container, path, file_name, encode='UTF-8'):
+    def download_file_as_binary(self, container, path, file_name):
+        """download file as binary.
+
+        Args:
+            container (str): name of the container.
+            path (str): path of the file.
+            file_name (str): file name.
+
+        Returns:
+            Binary: file as binary
+        """
         file_system_client = self.service_client.get_file_system_client(file_system=container)
 
         directory_client = file_system_client.get_directory_client(path)
@@ -97,6 +158,20 @@ class ConnectionAzureDataLake:
 
         download = file_client.download_file()
 
-        downloaded_bytes = download.readall()
+        return download.readall()
+
+    def download_file_as_string(self, container, path, file_name, encode='UTF-8'):
+        """download file as string.
+
+        Args:
+            container (str): name of the container.
+            path (str): path of the file.
+            file_name (str): file name.
+            encode (str, optional): type of encode of the data. Defaults to 'UTF-8'.
+
+        Returns:
+            string: file as string
+        """
+        downloaded_bytes = self.download_file_as_binary(container, path, file_name)
 
         return downloaded_bytes.decode(encode)
