@@ -22,7 +22,7 @@ class ConnectionAzureDataLake:
             "https", storage_account_name), credential=credential)
     
 
-    def list_directory_contents(self, container, path=''):
+    def list_directory_contents(self, container: str, path=''):
         """list all directory content.
 
         Args:
@@ -68,15 +68,18 @@ class ConnectionAzureDataLake:
 
         return pd.DataFrame(all_containers_dict).T
 
-    def create_container(self, container_name):
+    def create_container(self, container_name: str) -> None:
         """create a new container in the storage account.
 
         Args:
             container_name (str): container name.
         """
-        self.file_system_client = self.service_client.create_file_system(file_system=container_name)
+        self.service_client.create_file_system(file_system=container_name)
 
-    def create_directory(self, container, path):
+    def delete_container(self, container_name: str) -> None:
+        self.service_client.delete_file_system(file_system=container_name)
+
+    def create_directory(self, container: str, path: str):
         """create a directory in the container.
 
         Args:
@@ -86,7 +89,7 @@ class ConnectionAzureDataLake:
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         file_system_client.create_directory(path)
 
-    def rename_directory(self, container, directory, new_directory_name):
+    def rename_directory(self, container: str, directory: str, new_directory_name: str):
         """rename directory in the datalake, it is the same of move a file.
 
         Args:
@@ -99,7 +102,7 @@ class ConnectionAzureDataLake:
         new_dir_name = new_directory_name
         directory_client.rename_directory(directory_client.file_system_name + '/' + new_dir_name)
 
-    def delete_directory(self, container, path):
+    def delete_directory(self, container: str, path: str):
         """delete directory in datalake.
 
         Args:
@@ -110,7 +113,7 @@ class ConnectionAzureDataLake:
         directory_client = file_system_client.get_directory_client(path)
         directory_client.delete_directory()
 
-    def save_string_to_file(self, container, path, file_name, string, overwrite=False):
+    def save_string_to_file(self, container: str, path: str, file_name: str, string: str, overwrite=False):
         """save a string to a file in datalake.
 
         Args:
@@ -139,7 +142,7 @@ class ConnectionAzureDataLake:
 
         file_client.flush_data(len(file_contents))
 
-    def download_file_as_binary(self, container, path, file_name):
+    def download_file_as_binary(self, container: str, path: str, file_name: str):
         """download file as binary.
 
         Args:
@@ -160,7 +163,7 @@ class ConnectionAzureDataLake:
 
         return download.readall()
 
-    def download_file_as_string(self, container, path, file_name, encode='UTF-8'):
+    def download_file_as_string(self, container: str, path: str, file_name: str, encode='UTF-8'):
         """download file as string.
 
         Args:
