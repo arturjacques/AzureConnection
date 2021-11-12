@@ -1,4 +1,0 @@
-pandas
-requests
-azure-storage-file-datalake --pre
-azure-identity

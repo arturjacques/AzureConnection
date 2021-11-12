@@ -8,7 +8,7 @@ class ConnectionAzureDataLake:
     def __init__(self):
         pass
 
-    def initialize_storage_account_ad_env_variable(self):
+    def initialize_storage_account_ad_env_variable(self) -> None:
         """get cliend id, client secrect, tenant id and the storage account name from the enviroment variables and authenticat.
         """
         client_id = os.environ['client_id']
@@ -49,11 +49,11 @@ class ConnectionAzureDataLake:
 
         return pd.DataFrame(directories).T
 
-    def list_containers(self):
+    def list_containers(self) -> pd.DataFrame:
         """list containers in the storage account.
 
         Returns:
-            DataFrame: Returns a dataframe with the container name and the last date of modification.
+            pd.DataFrame: Returns a dataframe with the container name and the last date of modification.
         """
         containers = self.service_client.list_file_systems()
 

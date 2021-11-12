@@ -15,5 +15,5 @@ storage_account_name # with the name of the storage account that will be used
 
 pandas  
 requests  
-azure-storage-file-datalake --pre  
+azure-storage-file-datalake  
 azure-identity  
