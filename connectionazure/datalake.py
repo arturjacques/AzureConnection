@@ -1,4 +1,5 @@
 import os
+from typing import BinaryIO
 from azure.storage.filedatalake import DataLakeServiceClient
 from azure.identity import ClientSecretCredential
 import pandas as pd
@@ -77,6 +78,11 @@ class ConnectionAzureDataLake:
         self.service_client.create_file_system(file_system=container_name)
 
     def delete_container(self, container_name: str) -> None:
+        """delete a container in the storage account.
+
+        Args:
+            container_name (str): container name to be delted.
+        """
         self.service_client.delete_file_system(file_system=container_name)
 
     def create_directory(self, container: str, path: str):
@@ -107,20 +113,20 @@ class ConnectionAzureDataLake:
 
         Args:
             container (str): name of the contaier
-            path ([type]): path of the file to be deleted
+            path (str): path of the file to be deleted
         """
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         directory_client = file_system_client.get_directory_client(path)
         directory_client.delete_directory()
 
-    def save_string_to_file(self, container: str, path: str, file_name: str, string: str, overwrite=False):
+    def upload_file_to_directory(self, container: str, path: str, file_name: str, data: bytes, overwrite=False):
         """save a string to a file in datalake.
 
         Args:
             container (str): name of the container.
             path (str): path were it will be save.
-            file_name ([type]): name of the file.
-            string ([type]): data that will be save as string.
+            file_name (str): name of the file.
+            data (bytes): data that will be save as binary.
             overwrite (bool, optional): if the file will be overwriten or not. Defaults to False.
 
         Raises:
@@ -136,11 +142,29 @@ class ConnectionAzureDataLake:
         directory_client = file_system_client.get_directory_client(path)
         file_client = directory_client.create_file(file_name)
 
-        file_contents = string
+        file_contents = data
 
         file_client.append_data(data=file_contents, offset=0, length=len(file_contents))
 
         file_client.flush_data(len(file_contents))
+
+    def upload_file_to_directory_bulk(self, container: str, path: str, file_name: str, data: bytes, overwrite=False):
+        """Upload bigger files to data lake
+
+        Args:
+            container (str): name of the container.
+            path (str): path were it will be save.
+            file_name (str): name of the file.
+            data (bytes): data that will be save as binary.
+             overwrite (bool, optional): if the file will be overwriten or not. Defaults to False.
+        """
+        file_system_client = self.service_client.get_file_system_client(file_system=container)
+
+        directory_client = file_system_client.get_directory_client(path)
+        
+        file_client = directory_client.create_file(file_name)
+
+        file_client.upload_data(data, overwrite=overwrite)
 
     def download_file_as_binary(self, container: str, path: str, file_name: str):
         """download file as binary.
