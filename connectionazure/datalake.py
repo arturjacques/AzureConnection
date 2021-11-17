@@ -23,7 +23,7 @@ class ConnectionAzureDataLake:
             "https", storage_account_name), credential=credential)
     
 
-    def list_directory_contents(self, container: str, path=''):
+    def list_directory_contents(self, container: str, path='') -> pd.DataFrame:
         """list all directory content.
 
         Args:
@@ -158,13 +158,19 @@ class ConnectionAzureDataLake:
             data (bytes): data that will be save as binary.
              overwrite (bool, optional): if the file will be overwriten or not. Defaults to False.
         """
+        if overwrite==False:
+            paths_df = self.list_directory_contents(container=container, path=path)
+            if len(paths_df)>0:
+                if (path + '/' + file_name) in paths_df.path.values:
+                    raise Exception(f"{path + '/' + file_name} already exists, can be set overwrite=True to overwrite this file.")
+
         file_system_client = self.service_client.get_file_system_client(file_system=container)
 
         directory_client = file_system_client.get_directory_client(path)
         
         file_client = directory_client.create_file(file_name)
 
-        file_client.upload_data(data, overwrite=overwrite)
+        file_client.upload_data(data, overwrite=True)
 
     def download_file_as_binary(self, container: str, path: str, file_name: str):
         """download file as binary.
