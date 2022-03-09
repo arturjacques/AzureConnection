@@ -1,10 +1,10 @@
-from tests.unit.unit_base_teste import UnitBaseTest
+from tests.integration.integration_base_test import IntegrationBaseTest
 from connectionazure.datalake import ConnectionAzureDataLake
 from pandas import DataFrame
 
 from random import randint
 
-class ConnectionAzureDataLakeTest(UnitBaseTest):       
+class ConnectionAzureDataLakeTest(IntegrationBaseTest):       
     def setUp(self) -> None:
         super().setUp()
 
@@ -114,8 +114,3 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
 
         expected = 'the data is correct on this file'
         self.assertEqual(download, expected)
-
-    
-
-
-        
