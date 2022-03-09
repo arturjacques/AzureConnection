@@ -41,7 +41,7 @@ class ConnectionAzureDataLake:
         count=0
         for path in paths:
             directory = dict()
-            directory['permission'] = path.permissions
+            directory['permissions'] = path.permissions
             directory['path'] = path.name
             directory['last_modified'] = path.last_modified
             directory['owner'] = path.owner
@@ -95,6 +95,17 @@ class ConnectionAzureDataLake:
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         file_system_client.create_directory(path)
 
+    def delete_directory(self, container: str, path: str):
+        """delete directory in datalake.
+
+        Args:
+            container (str): name of the contaier
+            path (str): path of the file to be deleted
+        """
+        file_system_client = self.service_client.get_file_system_client(file_system=container)
+        directory_client = file_system_client.get_directory_client(path)
+        directory_client.delete_directory()
+    
     def rename_directory(self, container: str, directory: str, new_directory_name: str):
         """rename directory in the datalake, it is the same of move a file.
 
@@ -108,16 +119,17 @@ class ConnectionAzureDataLake:
         new_dir_name = new_directory_name
         directory_client.rename_directory(directory_client.file_system_name + '/' + new_dir_name)
 
-    def delete_directory(self, container: str, path: str):
-        """delete directory in datalake.
+        return True
 
-        Args:
-            container (str): name of the contaier
-            path (str): path of the file to be deleted
-        """
-        file_system_client = self.service_client.get_file_system_client(file_system=container)
-        directory_client = file_system_client.get_directory_client(path)
-        directory_client.delete_directory()
+    def check_if_path_exists(self, container, path, file_name):
+        paths_df = self.list_directory_contents(container=container, path=path)
+
+        if path=='/':
+            path=''
+        if len(paths_df)>0:
+            if (path + '/' + file_name) in paths_df.path.values:
+                return True
+        return False
 
     def upload_file_to_directory(self, container: str, path: str, file_name: str, data: bytes, overwrite=False):
         """save a string to a file in datalake.
@@ -133,10 +145,9 @@ class ConnectionAzureDataLake:
             Exception: if the file already exists and overwrite equals false it will be raise.
         """
         if overwrite==False:
-            paths_df = self.list_directory_contents(container=container, path=path)
-            if len(paths_df)>0:
-                if (path + '/' + file_name) in paths_df.path.values:
-                    raise Exception(f"{path + '/' + file_name} already exists, can be set overwrite=True to overwrite this file.")
+            resp = self.check_if_path_exists(container, path, file_name)
+            if resp:
+                raise Exception(f"{path + '/' + file_name} already exists, can be set overwrite=True to overwrite this file.")
 
         file_system_client = self.service_client.get_file_system_client(file_system=container)
         directory_client = file_system_client.get_directory_client(path)
@@ -159,10 +170,9 @@ class ConnectionAzureDataLake:
              overwrite (bool, optional): if the file will be overwriten or not. Defaults to False.
         """
         if overwrite==False:
-            paths_df = self.list_directory_contents(container=container, path=path)
-            if len(paths_df)>0:
-                if (path + '/' + file_name) in paths_df.path.values:
-                    raise Exception(f"{path + '/' + file_name} already exists, can be set overwrite=True to overwrite this file.")
+            resp = self.check_if_path_exists(container, path, file_name)
+            if resp:
+                raise Exception(f"{path + '/' + file_name} already exists, can be set overwrite=True to overwrite this file.")
 
         file_system_client = self.service_client.get_file_system_client(file_system=container)
 
@@ -170,7 +180,7 @@ class ConnectionAzureDataLake:
         
         file_client = directory_client.create_file(file_name)
 
-        file_client.upload_data(data, overwrite=True)
+        file_client.upload_data(data, overwrite=overwrite)
 
     def download_file_as_binary(self, container: str, path: str, file_name: str):
         """download file as binary.
