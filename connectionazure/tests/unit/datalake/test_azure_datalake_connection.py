@@ -367,7 +367,43 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
         self.assertEqual(download, expected)
         self.datalake_connection.download_file_as_binary.assert_called_with(container, path, file_name)
 
-    
+    @patch('builtins.print')
+    @patch('connectionazure.datalake.read_file_as_bytes')
+    @patch('connectionazure.datalake.os')
+    def test_move_directory_recursive(self, mock_os, mock_read_file_as_bytes, mock_print):
+        upload_file_mock = Mock()
+        self.datalake_connection.upload_file_to_directory_bulk = upload_file_mock
+        source_directory = 'root_folder'
+        container = 'upload_container'
+        sink_path = 'container_folder'
 
+        expected_read_calls = ['root_folder/file.txt', 'root_folder/folder/inner_file.txt']
+        
+        def mock_listdir(folder):
+            if folder=='root_folder':
+                return ['folder', 'file.txt']
+            elif folder=='root_folder/folder':
+                return ['inner_file.txt']
+
+
+        def mock_isdir(directory):
+            if directory=='root_folder/folder':
+                return True
+            else:
+                return False
 
         
+        mock_os.listdir = mock_listdir
+        mock_os.path.isdir = mock_isdir
+
+        self.datalake_connection.move_directory_recursive(source_directory, container, sink_path)
+
+        mock_read_file_as_bytes.assert_any_call(expected_read_calls[0])
+        mock_read_file_as_bytes.assert_any_call(expected_read_calls[1])
+
+        upload_file_mock.assert_any_call(container=container, path=sink_path, file_name='file.txt', data=mock_read_file_as_bytes(), overwrite=True)
+        upload_file_mock.assert_any_call(container=container, path=sink_path+'/folder', file_name='inner_file.txt', data=mock_read_file_as_bytes(), overwrite=True)
+
+        mock_print.assert_any_call('root_folder/file.txt copied')
+        mock_print.assert_any_call('root_folder/folder/inner_file.txt copied')
+

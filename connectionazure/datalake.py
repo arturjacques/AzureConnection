@@ -1,8 +1,8 @@
 import os
-from typing import BinaryIO
 from azure.storage.filedatalake import DataLakeServiceClient
 from azure.identity import ClientSecretCredential
 import pandas as pd
+from connectionazure.utils import read_file_as_bytes
 
 
 class ConnectionAzureDataLake:
@@ -218,3 +218,30 @@ class ConnectionAzureDataLake:
         downloaded_bytes = self.download_file_as_binary(container, path, file_name)
 
         return downloaded_bytes.decode(encode)
+
+    def move_directory_recursive(self, source_path, sink_container, sink_path):
+        """
+        move all files from a folder to datalake.
+
+        Parameters
+        ----------
+        source_path : str
+            Folder where is the files that will be moved
+        sink_container : str
+            container that will be moved to
+        sink_path: str
+            path that the files will be moved
+        """
+        directories = os.listdir(source_path)
+
+        for directory in directories:
+            local_path = source_path + '/' + directory
+
+            if os.path.isdir(local_path):
+                sink_path_added_folder = sink_path + '/' + directory
+                self.move_directory_recursive(local_path, sink_container, sink_path_added_folder)
+
+            else:
+                file_content = read_file_as_bytes(local_path)
+                self.upload_file_to_directory_bulk(container=sink_container, path=sink_path, file_name=directory, data=file_content, overwrite=True)
+                print(f'{local_path} copied')
