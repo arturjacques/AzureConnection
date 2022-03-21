@@ -12,7 +12,6 @@ class ConnectionAzureDataLakeTest(IntegrationBaseTest):
         self.datalake_connection = ConnectionAzureDataLake()
         self.datalake_connection.initialize_storage_account_ad_env_variable()
         self.test_container = 'test-validation-container'
-        self.dummy_rename_file = {'container': self.test_container, 'path':'test_folder/test_rename_file.txt'}
         self.dummy_download_file = {'container': self.test_container, 'path':'test_folder', 'file_name':'test_file.txt'}
 
     def test_list_containers(self):
@@ -50,20 +49,28 @@ class ConnectionAzureDataLakeTest(IntegrationBaseTest):
         
         self.datalake_connection.delete_directory(container=self.test_container, path=directory_name)
 
-    def test_rename_directory(self):
+    def test_upload_and_rename_directory(self):
+        upload_file_name = f'test_rename_folder/teste-file-{randint(0, 9999)}.txt'
+        upload_file_path = '/'
+        file_content = b'Hello from test upload file to directory'
         new_directory_rename = f'teste-rename-{randint(0, 9999)}'
 
-        self.datalake_connection.rename_directory(container=self.dummy_rename_file['container'],
-                                                  directory=self.dummy_rename_file['path'],
+        self.datalake_connection.upload_file_to_directory_bulk(container=self.test_container,
+                                                                path=upload_file_path,
+                                                                file_name=upload_file_name,
+                                                                data=file_content)
+
+        
+        self.datalake_connection.rename_directory(container=self.test_container,
+                                                  directory=upload_file_path + '/' + upload_file_name,
                                                   new_directory_name=new_directory_rename)
 
         directory_renamed = new_directory_rename in self.datalake_connection.list_directory_contents(container=self.test_container).path.to_list()
 
         self.assertTrue(directory_renamed)
 
-        self.datalake_connection.rename_directory(container=self.dummy_rename_file['container'],
-                                                  directory=new_directory_rename,
-                                                  new_directory_name=self.dummy_rename_file['path'])
+        self.datalake_connection.delete_directory(container=self.test_container,
+                                                  path=new_directory_rename)
 
     def test_upload_file_to_directory(self):
         file_name = f'teste-file-{randint(0, 9999)}.txt'
