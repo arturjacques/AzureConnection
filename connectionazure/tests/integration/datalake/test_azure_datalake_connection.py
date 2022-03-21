@@ -1,4 +1,4 @@
-from tests.integration.integration_base_test import IntegrationBaseTest
+from connectionazure.tests.integration.integration_base_test import IntegrationBaseTest
 from connectionazure.datalake import ConnectionAzureDataLake
 from pandas import DataFrame
 import os
