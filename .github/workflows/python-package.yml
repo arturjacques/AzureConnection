@@ -37,4 +37,8 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
+        export client_id=${{ secrets.client_id }}
+        export client_secret=${{ secrets.client_secret }}
+        export tenant_id=${{ secrets.tenant_id }}
+        export storage_account_name=${{ secrets.storage_account_name }}
         pytest
