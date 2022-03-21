@@ -10,11 +10,12 @@ class MockContainer:
         self.last_modified = last_modified
 
 class MockDirectory:
-    def __init__(self, permissions, path, last_modified, owner):
+    def __init__(self, permissions, path, last_modified, owner, is_directory):
         self.permissions = permissions
         self.name = path
         self.last_modified = last_modified
         self.owner = owner
+        self.is_directory = is_directory
 
 class MockDirectoryList:
     def __init__(self):
@@ -22,9 +23,10 @@ class MockDirectoryList:
         last_modified = pd.date_range('2000-01-01', '2020-12-31', periods=3).to_list()
         permissions_list = ['rw-r-----', 'rwxrwxrwx', 'rwxr-----']
         path = ['202105180007', '202105180007/teste', '202105180008']
+        is_directory = [False, True, False]
 
         self.directory = []
-        for file in zip(owner, last_modified, permissions_list, path):
+        for file in zip(owner, last_modified, permissions_list, path, is_directory):
             self.directory.append(MockDirectory(*file))
     
     def get_paths(self, path):
@@ -64,7 +66,7 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
     def test_list_directory_contents(self):
         container = 'test_container'
         self.datalake_connection.service_client.get_file_system_client.return_value = MockDirectoryList()
-        expected_columns = ['permissions', 'path', 'last_modified', 'owner']
+        expected_columns = ['permissions', 'path', 'last_modified', 'owner', 'is_directory']
 
         directory = self.datalake_connection.list_directory_contents(container=container)
 
@@ -302,7 +304,7 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
             .service_client.get_file_system_client()
             .get_directory_client()
             .create_file()
-            .upload_data.assert_called_with(file_content, overwrite=False))
+            .upload_data.assert_called_with(file_content, overwrite=True))
 
     def test_download_file_as_binary(self):
         container = 'container_test'
@@ -407,3 +409,81 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
         mock_print.assert_any_call('root_folder/file.txt copied')
         mock_print.assert_any_call('root_folder/folder/inner_file.txt copied')
 
+    def test_upload_dataframe_as_parquet(self):
+        container = 'upload_container'
+        sink_path = 'container_folder'
+        file_name = 'df_test.parquet'
+
+        mock_upload_file_to_directory_bulk = Mock()
+        df = Mock()
+        self.datalake_connection.upload_file_to_directory_bulk = mock_upload_file_to_directory_bulk
+
+        resp = self.datalake_connection.upload_dataframe_as_parquet(df, container, sink_path, file_name)
+
+        df.to_parquet.asset_called_with()
+        mock_upload_file_to_directory_bulk.assert_called_with(container=container, path=sink_path, file_name=file_name, data=df.to_parquet())
+        self.assertTrue(resp)
+
+    def test_upload_dataframe_as_parquet_raise(self):
+        container = 'upload_container'
+        sink_path = 'container_folder'
+        file_name = 'df_test.parquet'
+        to_parquet_options_dict = {
+            "path":'C:/'
+        }
+        
+        error_msg = 'The dataframe will not be saved in datalake if path is sended on kwargs'
+
+        mock_upload_file_to_directory_bulk = Mock()
+        df = Mock()
+        self.datalake_connection.upload_file_to_directory_bulk = mock_upload_file_to_directory_bulk
+
+        with self.assertRaises(Exception) as context:
+            self.datalake_connection.upload_dataframe_as_parquet(df, container, sink_path, file_name, to_parquet_options_dict)
+
+        self.assertEqual(error_msg, context.exception.args[0])
+
+    def test_upload_dataframe_as_parquet_parquet_options(self):
+        container = 'upload_container'
+        sink_path = 'container_folder'
+        file_name = 'df_test.parquet'
+        to_parquet_options_dict = {
+            "engine":'pyarrow',
+            "compression": 'gzip'
+        }
+
+        mock_upload_file_to_directory_bulk = Mock()
+        df = Mock()
+        self.datalake_connection.upload_file_to_directory_bulk = mock_upload_file_to_directory_bulk
+
+        resp = self.datalake_connection.upload_dataframe_as_parquet(df, container, sink_path, file_name, to_parquet_options_dict)
+
+        df.to_parquet.asset_called_with(**to_parquet_options_dict)
+
+        mock_upload_file_to_directory_bulk.assert_called_with(container=container, path=sink_path, file_name=file_name, data=df.to_parquet(**to_parquet_options_dict))
+        self.assertTrue(resp)
+
+    def test_download_parquet_as_dataframe(self):
+        container = 'upload_container'
+        source_path = 'container_folder'
+        file_name = 'df_test.parquet'
+        read_parquet_options_dict = {
+            "engine":'pyarrow',
+            "compression": 'gzip'
+        }
+
+        mock_download_file_as_binary = Mock()
+        self.datalake_connection.download_file_as_binary = mock_download_file_as_binary
+
+        dataframe_dict = {
+            'id': [1, 2, 3, 4],
+            'value': [18.5, 20.1, 100.0, 0.5]
+        }
+
+        df = pd.DataFrame(dataframe_dict)
+        
+        mock_download_file_as_binary.return_value = df.to_parquet(**read_parquet_options_dict)
+
+        df_returned = self.datalake_connection.download_parquet_as_dataframe(container, source_path, file_name)
+
+        self.assertTrue(df.equals(df_returned))
