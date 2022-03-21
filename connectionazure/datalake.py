@@ -3,6 +3,7 @@ from azure.storage.filedatalake import DataLakeServiceClient
 from azure.identity import ClientSecretCredential
 import pandas as pd
 from connectionazure.utils import read_file_as_bytes
+from io import BytesIO
 
 
 class ConnectionAzureDataLake:
@@ -45,6 +46,7 @@ class ConnectionAzureDataLake:
             directory['path'] = path.name
             directory['last_modified'] = path.last_modified
             directory['owner'] = path.owner
+            directory['is_directory'] = path.is_directory
             directories[count] = directory.copy()
             count+=1
 
@@ -180,7 +182,8 @@ class ConnectionAzureDataLake:
         
         file_client = directory_client.create_file(file_name)
 
-        file_client.upload_data(data, overwrite=overwrite)
+        # overwrite must be set to True to end-point work
+        file_client.upload_data(data, overwrite=True)
 
     def download_file_as_binary(self, container: str, path: str, file_name: str):
         """download file as binary.
@@ -219,7 +222,7 @@ class ConnectionAzureDataLake:
 
         return downloaded_bytes.decode(encode)
 
-    def move_directory_recursive(self, source_path, sink_container, sink_path):
+    def move_directory_recursive(self, source_path: str, sink_container: str, sink_path: str) -> bool:
         """
         move all files from a folder to datalake.
 
@@ -245,3 +248,48 @@ class ConnectionAzureDataLake:
                 file_content = read_file_as_bytes(local_path)
                 self.upload_file_to_directory_bulk(container=sink_container, path=sink_path, file_name=directory, data=file_content, overwrite=True)
                 print(f'{local_path} copied')
+
+        return True
+
+    def upload_dataframe_as_parquet(self, df: pd.DataFrame, container: str, sink_path: str, file_name: str, to_parquet_options_dict: dict={}) -> bool:
+        """upload DataFrame to datalake as parquet.
+
+        Args:
+            df (pd.DataFrame): dataframe to be uploaded
+            container (str): sink container
+            sink_path (str): sink path
+            file_name (str): name of the file that will be saved
+            to_parquet_options_dict (str): options to transform the dataframe in parquet
+
+        Raises:
+            Exception: the upload will fail if the path arg on to_parquet_options_dict
+
+        Returns:
+            bool: True if the file was upload with success
+        """
+        if 'path' in to_parquet_options_dict.keys():
+            raise Exception('The dataframe will not be saved in datalake if path is sended on kwargs')
+
+        binary = df.to_parquet(**to_parquet_options_dict)
+
+        self.upload_file_to_directory_bulk(container=container, path=sink_path, file_name=file_name, data=binary)
+
+        return True
+
+    def download_parquet_as_dataframe(self, container:str, source_path: str, file_name: str, read_parquet_options_dict:dict = {})-> pd.DataFrame:
+        """download parquet binary as dataframe
+
+        Args:
+            container (str): source container
+            source_path (str): source path
+            file_name (str): file name
+            read_parquet_options_dict (dict): options to read parquet binary as dataframe
+
+        Returns:
+            pd.DataFrame: dataframe object generate from binary on datalake
+        """
+
+        df_binary = self.download_file_as_binary(container=container, path=source_path, file_name=file_name)
+        pq_file = BytesIO(df_binary)
+
+        return pd.read_parquet(pq_file, **read_parquet_options_dict)

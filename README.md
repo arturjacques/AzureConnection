@@ -17,3 +17,4 @@ pandas
 requests  
 azure-storage-file-datalake  
 azure-identity  
+pyarrow  
