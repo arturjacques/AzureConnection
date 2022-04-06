@@ -1,9 +1,11 @@
 import os
 from azure.storage.filedatalake import DataLakeServiceClient
 from azure.identity import ClientSecretCredential
+from numpy import source
 import pandas as pd
-from connectionazure.utils import read_file_as_bytes
+from connectionazure.utils import read_file_as_bytes, write_file_as_bytes
 from io import BytesIO
+import concurrent.futures
 
 
 class ConnectionAzureDataLake:
@@ -222,7 +224,27 @@ class ConnectionAzureDataLake:
 
         return downloaded_bytes.decode(encode)
 
-    def move_directory_recursive(self, source_path: str, sink_container: str, sink_path: str) -> bool:
+    def download_to_file(self, container: str, source_path: str, path_sink: str) -> bool:
+        """download a file on datalake to a local file.
+
+        Args:
+            container (str): source container
+            source_path (str): path of the file on the container
+            path_sink (str): path that the file will be saved
+
+        Returns:
+            bool: True if the file was saved.
+        """
+        file_name = source_path.split('/')[-1]
+        source_directory = '/'.join(source_path.split('/')[:-1])
+
+        binary = self.download_file_as_binary(container, source_directory, file_name)
+
+        write_file_as_bytes(path_sink, binary)
+
+        return True
+
+    def upload_directory_recursive(self, source_path: str, sink_container: str, sink_path: str) -> bool:
         """
         move all files from a folder to datalake.
 
@@ -242,12 +264,41 @@ class ConnectionAzureDataLake:
 
             if os.path.isdir(local_path):
                 sink_path_added_folder = sink_path + '/' + directory
-                self.move_directory_recursive(local_path, sink_container, sink_path_added_folder)
+                self.upload_directory_recursive(local_path, sink_container, sink_path_added_folder)
 
             else:
                 file_content = read_file_as_bytes(local_path)
                 self.upload_file_to_directory_bulk(container=sink_container, path=sink_path, file_name=directory, data=file_content, overwrite=True)
                 print(f'{local_path} copied')
+
+        return True
+
+    def download_directory(self, source_container: str, source_path: str, sink_path: str) -> bool:
+        """Download all files of a directory to a local folder.
+
+        Args:
+            source_container (str): container that the data is.
+            source_path (str): path of the files that 
+            sink_path (str): _description_
+
+        Returns:
+            bool: _description_
+        """
+        df_directory_list = self.list_directory_contents(source_container, source_path)
+        df_only_file_list = df_directory_list[df_directory_list.is_directory==False].copy()
+
+        source_path_list = source_path.split('/')
+        source_path_list_clean = list(filter(lambda a: a != '', source_path_list))
+
+        sink_path_list = sink_path.split('/')
+        sink_path_list_clean = list(filter(lambda a: a != '', sink_path_list))
+
+        df_only_file_list['local_path'] = '/'.join(sink_path_list_clean) + '/' + df_only_file_list.path.str.split('/').apply(lambda x: '/'.join(x[len(source_path_list_clean):]))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            for _, row in df_only_file_list.iterrows():
+                executor.submit(self.download_to_file, source_container, row['path'], row['local_path'])
+            
 
         return True
 
