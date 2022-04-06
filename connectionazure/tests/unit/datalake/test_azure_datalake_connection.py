@@ -372,7 +372,7 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
     @patch('builtins.print')
     @patch('connectionazure.datalake.read_file_as_bytes')
     @patch('connectionazure.datalake.os')
-    def test_move_directory_recursive(self, mock_os, mock_read_file_as_bytes, mock_print):
+    def test_upload_directory_recursive(self, mock_os, mock_read_file_as_bytes, mock_print):
         upload_file_mock = Mock()
         self.datalake_connection.upload_file_to_directory_bulk = upload_file_mock
         source_directory = 'root_folder'
@@ -398,7 +398,7 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
         mock_os.listdir = mock_listdir
         mock_os.path.isdir = mock_isdir
 
-        self.datalake_connection.move_directory_recursive(source_directory, container, sink_path)
+        self.datalake_connection.upload_directory_recursive(source_directory, container, sink_path)
 
         mock_read_file_as_bytes.assert_any_call(expected_read_calls[0])
         mock_read_file_as_bytes.assert_any_call(expected_read_calls[1])
@@ -408,6 +408,96 @@ class ConnectionAzureDataLakeTest(UnitBaseTest):
 
         mock_print.assert_any_call('root_folder/file.txt copied')
         mock_print.assert_any_call('root_folder/folder/inner_file.txt copied')
+
+    def test_download_directory(self):
+        container = 'dev'
+        source_path = 'backup'
+        sink_path = 'tmp'
+
+
+        mock_download_to_file = Mock()
+        mock_list_direcotory_content = Mock()
+        self.datalake_connection.download_to_file = mock_download_to_file
+        self.datalake_connection.list_directory_contents = mock_list_direcotory_content
+
+        df_dict = {'path': {0: 'backup/democopy',
+                    1: 'backup/democopy/file1.txt',
+                    2: 'backup/democopy/file2.txt',
+                    3: 'backup/democopy/file3.txt'},
+                    'is_directory': {0: True, 1: False, 2: False, 3: False}}
+
+        df = pd.DataFrame(df_dict)
+
+        mock_list_direcotory_content.return_value = df
+
+        expected_local_path_download = ['tmp/democopy/file1.txt', 'tmp/democopy/file2.txt', 'tmp/democopy/file3.txt']
+
+        self.datalake_connection.download_directory(source_container=container, source_path=source_path, sink_path=sink_path)
+
+        mock_download_to_file.assert_any_call(container, df_dict['path'][1], expected_local_path_download[0])
+        mock_download_to_file.assert_any_call(container, df_dict['path'][2], expected_local_path_download[1])
+        mock_download_to_file.assert_any_call(container, df_dict['path'][3], expected_local_path_download[2])
+        self.assertEqual(mock_download_to_file.call_count, 3)
+
+    def test_download_directory_root(self):
+        container = 'dev'
+        source_path = '/'
+        sink_path = 'tmp'
+
+
+        mock_download_to_file = Mock()
+        mock_list_direcotory_content = Mock()
+        self.datalake_connection.download_to_file = mock_download_to_file
+        self.datalake_connection.list_directory_contents = mock_list_direcotory_content
+
+        df_dict = {'path': {0: 'backup',
+                            1: 'backup/democopy',
+                            2: 'backup/democopy/file1.txt',
+                            3: 'backup/democopy/file2.txt',
+                            4: 'backup/democopy/file3.txt',
+                            5: 'hz_zone',
+                            6: 'hz_zone/democopy',
+                            7: 'hz_zone/housing_data',
+                            8: 'hz_zone/housing_data/HousingDataHZ.csv',
+                            9: 'hz_zone/sales',
+                            10: 'hz_zone/sales/_SUCCESS',
+                            11: 'hz_zone/sales/_committed_6039367007359554159',
+                            12: 'hz_zone/sales/_started_6039367007359554159',
+                            13: 'hz_zone/sales/part-00000-tid-6039367007359554159-f3876217-6039-4945-8490-633b85a8ba90-1-1-c000.csv',
+                            14: 'lz_zone',
+                            15: 'lz_zone/democopy'},
+                    'is_directory': {0: True,
+                                    1: True,
+                                    2: False,
+                                    3: False,
+                                    4: False,
+                                    5: True,
+                                    6: True,
+                                    7: True,
+                                    8: False,
+                                    9: True,
+                                    10: False,
+                                    11: False,
+                                    12: False,
+                                    13: False,
+                                    14: True,
+                                    15: True}}
+
+        df = pd.DataFrame(df_dict)
+
+        mock_list_direcotory_content.return_value = df
+
+        expected_local_path_download = ['tmp/hz_zone/housing_data/HousingDataHZ.csv',
+                                        'tmp/hz_zone/sales/_committed_6039367007359554159',
+                                        'tmp/backup/democopy/file3.txt']
+
+        self.datalake_connection.download_directory(source_container=container, source_path=source_path, sink_path=sink_path)
+
+        mock_download_to_file.assert_any_call(container, df_dict['path'][8], expected_local_path_download[0])
+        mock_download_to_file.assert_any_call(container, df_dict['path'][11], expected_local_path_download[1])
+        mock_download_to_file.assert_any_call(container, df_dict['path'][4], expected_local_path_download[2])
+        self.assertEqual(mock_download_to_file.call_count, 8)
+
 
     def test_upload_dataframe_as_parquet(self):
         container = 'upload_container'

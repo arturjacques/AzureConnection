@@ -123,7 +123,7 @@ class ConnectionAzureDataLakeTest(IntegrationBaseTest):
         expected = 'the data is correct on this file'
         self.assertEqual(download, expected)
 
-    def test_move_directory_recursive(self):
+    def test_upload_directory_recursive(self):
         sink_path = f'recursive_test_{randint(0, 9999)}'
         test_container = self.test_container
 
@@ -147,7 +147,7 @@ class ConnectionAzureDataLakeTest(IntegrationBaseTest):
         with open('tmp/second_folder/second_folder_file.txt', 'w') as f:
             f.write('second_folder_file has this data')
 
-        self.datalake_connection.move_directory_recursive('tmp', test_container, sink_path)
+        self.datalake_connection.upload_directory_recursive('tmp', test_container, sink_path)
 
         directory_list = self.datalake_connection.list_directory_contents(test_container, sink_path).path.to_list()
 
